@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
       printf("%s\n", arg);
     }
     else if (strcmp(builtin, "type") == 0) {
-      if (find_type(builtin, types, types_size) >= 0) {
+      if (find_type(arg, types, types_size) >= 0) {
         printf("%s is a shell builtin\n", arg);
       }
       else {
