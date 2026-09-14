@@ -1,16 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define MAX_COMMAND_LENGTH 100
 
-int find_type(char* type, const char* types[], int n_types) {
-  for (int i = 0; i < n_types; i++) {
-    if (strcmp(types[i], type) == 0) {
-      return i;
+static const char *const commands[] = {"echo", "exit", "type", NULL};
+
+void handle_type(char* command) {
+  for (int i = 0; commands[i] != NULL; i++) {
+    if (strcmp(commands[i], command) == 0) {
+      printf("%s is a shell builtin\n", command);
+      return;
     }
   }
-  return -1;
+  printf("%s: not found\n", command);
 }
 
 int main(int argc, char *argv[]) {
@@ -18,8 +22,6 @@ int main(int argc, char *argv[]) {
   setbuf(stdout, NULL);
 
   char command[MAX_COMMAND_LENGTH];
-  const char* types[] = {"echo", "exit", "type"};
-  int types_size = sizeof(types) / sizeof(types[0]);
 
   int should_exit = 0;
   while (!should_exit) {
@@ -41,12 +43,7 @@ int main(int argc, char *argv[]) {
       printf("%s\n", arg);
     }
     else if (strcmp(builtin, "type") == 0) {
-      if (find_type(arg, types, types_size) >= 0) {
-        printf("%s is a shell builtin\n", arg);
-      }
-      else {
-        printf("%s: not found\n", arg);
-      }
+      handle_type(arg);
     }
     else {
       printf("%s: command not found\n", builtin);
