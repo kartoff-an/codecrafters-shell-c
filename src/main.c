@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #define MAX_COMMAND_LENGTH 100
 
@@ -14,6 +15,33 @@ void handle_type(char* command) {
       return;
     }
   }
+
+  const char *path = getenv("PATH");
+  if (path == NULL) {
+    printf("%s: not found\n", command);
+    return;
+  }
+
+  char *path_copy = strdup(path);
+  if (path_copy == NULL) {
+    perror("strdup");
+    return;
+  }
+
+  char full_path[PATH_MAX];
+  char *dir = strtok(path_copy, ":");
+
+  while (dir != NULL) {
+    snprintf(full_path, sizeof(full_path), "%s/%s", dir, command);
+    if (access(full_path, X_OK) == 0) {
+      printf("%s is %s\n", command, full_path);
+      free(path_copy);
+      return;
+    }
+    dir = strtok(NULL, ":");
+  }
+
+  free(path_copy);
   printf("%s: not found\n", command);
 }
 
