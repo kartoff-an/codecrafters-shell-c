@@ -3,20 +3,47 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <sys/wait.h>
 
-#ifdef _WIN32
-  #define PATH_LIST_DELIM ";"
-  #define DIR_SEPARATOR '\\'
-  #define DIR_SEPARATOR_STR "\\"
-#else
-  #define PATH_LIST_DELIM ":"
-  #define DIR_SEPARATOR '/'
-  #define DIR_SEPARATOR_STR "/"
+#ifndef PATH_LIST_DELIM
+#define PATH_LIST_DELIM ":"
+#endif
+
+#ifndef DIR_SEPARATOR_STR
+#define DIR_SEPARATOR_STR "/"
 #endif
 
 #define MAX_COMMAND_LENGTH 100
+#define MAX_ARGS 64
 
 static const char *const commands[] = {"echo", "exit", "type", NULL};
+
+char* find_executable(char* command) {
+  const char *path = getenv("PATH");
+  if (path == NULL || *path == '\0') {
+    return NULL;
+  }
+
+  char *path_copy = strdup(path);
+  if (path_copy == NULL) {
+    return NULL;
+  }
+
+  char full_path[PATH_MAX];
+  char *saveptr = NULL;
+  char *dir = strtok_r(path_copy, PATH_LIST_DELIM, &saveptr);
+  while (dir != NULL) {
+    snprintf(full_path, sizeof(full_path), "%s" DIR_SEPARATOR_STR "%s", dir, command);
+    if (access(full_path, X_OK) == 0) {
+      free(path_copy);
+      return strdup(full_path);
+    }
+    dir = strtok_r(NULL, PATH_LIST_DELIM, &saveptr);
+  }
+
+  free(path_copy);
+  return NULL;
+}
 
 void handle_type(char* command) {
   for (int i = 0; commands[i] != NULL; i++) {
@@ -26,32 +53,12 @@ void handle_type(char* command) {
     }
   }
 
-  const char *path = getenv("PATH");
-  if (path == NULL) {
-    printf("%s: not found\n", command);
+  char* full_path = find_executable(command);
+  if (full_path != NULL) {
+    printf("%s is %s\n", command, full_path);
     return;
   }
 
-  char *path_copy = strdup(path);
-  if (path_copy == NULL) {
-    perror("strdup");
-    return;
-  }
-
-  char full_path[PATH_MAX];
-  char *dir = strtok(path_copy, PATH_LIST_DELIM);
-
-  while (dir != NULL) {
-    snprintf(full_path, sizeof(full_path), "%s" DIR_SEPARATOR_STR "%s", dir, command);
-    if (access(full_path, X_OK) == 0) {
-      printf("%s is %s\n", command, full_path);
-      free(path_copy);
-      return;
-    }
-    dir = strtok(NULL, ":");
-  }
-
-  free(path_copy);
   printf("%s: not found\n", command);
 }
 
@@ -59,32 +66,64 @@ int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
 
-  char command[MAX_COMMAND_LENGTH];
+  char input[MAX_COMMAND_LENGTH];
 
   int should_exit = 0;
   while (!should_exit) {
     printf("$ ");
 
-    fgets(command, sizeof(command), stdin);
-    command[strcspn(command, "\n")] = '\0';
-    char *builtin = strtok(command, " ");
+    fgets(input, sizeof(input), stdin);
+    input[strcspn(input, "\n")] = '\0';
+    char *cmd = strtok(input, " ");
     char *arg = strtok(NULL, "");
 
-    if (builtin == NULL) {
+    if (cmd == NULL) {
       continue;
     }
 
-    if (strcmp(builtin, "exit") == 0) {
+    if (strcmp(cmd, "exit") == 0) {
       break;
     }
-    else if (strcmp(builtin, "echo") == 0) {
+    else if (strcmp(cmd, "echo") == 0) {
       printf("%s\n", arg);
     }
-    else if (strcmp(builtin, "type") == 0) {
+    else if (strcmp(cmd, "type") == 0) {
       handle_type(arg);
     }
     else {
-      printf("%s: command not found\n", builtin);
+      char *full_path = find_executable(cmd);
+      if (full_path != NULL) {
+        char *exec_args[MAX_ARGS];
+        int arg_idx = 0;
+        exec_args[arg_idx++] = cmd;
+
+        if (arg != NULL) {
+          char *token = strtok(arg, " ");
+          while (token != NULL && arg_idx < MAX_ARGS - 1) {
+            exec_args[arg_idx++] = token;
+            token = strtok(NULL, " ");
+          }
+        }
+        exec_args[arg_idx] = NULL;
+
+        pid_t pid = fork();
+        if (pid == 0) {
+          execv(full_path, exec_args);
+          perror("execv");
+          exit(EXIT_FAILURE);
+        }
+        else if (pid > 0) {
+          int status;
+          waitpid(pid, &status, 0);
+        }
+        else {
+          perror("fork");
+        }
+
+        free(full_path);
+      } else {
+        printf("%s: command not found\n", cmd);
+      }
     }
   }
 
