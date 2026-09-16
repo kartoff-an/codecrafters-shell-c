@@ -4,6 +4,16 @@
 #include <unistd.h>
 #include <limits.h>
 
+#ifdef _WIN32
+  #define PATH_LIST_DELIM ";"
+  #define DIR_SEPARATOR '\\'
+  #define DIR_SEPARATOR_STR "\\"
+#else
+  #define PATH_LIST_DELIM ":"
+  #define DIR_SEPARATOR '/'
+  #define DIR_SEPARATOR_STR "/"
+#endif
+
 #define MAX_COMMAND_LENGTH 100
 
 static const char *const commands[] = {"echo", "exit", "type", NULL};
@@ -29,10 +39,10 @@ void handle_type(char* command) {
   }
 
   char full_path[PATH_MAX];
-  char *dir = strtok(path_copy, ":");
+  char *dir = strtok(path_copy, PATH_LIST_DELIM);
 
   while (dir != NULL) {
-    snprintf(full_path, sizeof(full_path), "%s/%s", dir, command);
+    snprintf(full_path, sizeof(full_path), "%s" DIR_SEPARATOR_STR "%s", dir, command);
     if (access(full_path, X_OK) == 0) {
       printf("%s is %s\n", command, full_path);
       free(path_copy);
