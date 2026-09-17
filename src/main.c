@@ -94,7 +94,9 @@ int main(int argc, char *argv[]) {
       printf("%s\n", cwd);
     }
     else if (strcmp(cmd, "cd") == 0) {
-      if (chdir(arg) != 0 || errno == ENOENT) {
+      if (arg == NULL) continue;
+      if (strcmp(arg, "~") == 0) arg = getenv("HOME");
+      if (chdir(arg) != 0 && errno == ENOENT) {
         printf("cd: %s: No such file or directory\n", arg);
       }
     }
