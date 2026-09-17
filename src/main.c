@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <errno.h>
 #include <sys/wait.h>
 
 #ifndef PATH_LIST_DELIM
@@ -16,7 +17,7 @@
 #define MAX_COMMAND_LENGTH 100
 #define MAX_ARGS 64
 
-static const char *const commands[] = {"echo", "exit", "type", "pwd", NULL};
+static const char *const commands[] = {"echo", "exit", "type", "pwd", "cd", NULL};
 
 char* find_executable(char* command) {
   const char *path = getenv("PATH");
@@ -91,6 +92,11 @@ int main(int argc, char *argv[]) {
       char cwd[FILENAME_MAX];
       getcwd(cwd, sizeof(cwd));
       printf("%s\n", cwd);
+    }
+    else if (strcmp(cmd, "cd") == 0) {
+      if (chdir(arg) != 0 || errno == ENOENT) {
+        printf("cd: %s: No such file or directory", arg);
+      }
     }
     else if (strcmp(cmd, "type") == 0) {
       handle_type(arg);
