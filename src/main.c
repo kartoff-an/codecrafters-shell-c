@@ -87,6 +87,11 @@ int main(int argc, char *argv[]) {
     else if (strcmp(cmd, "echo") == 0) {
       printf("%s\n", arg);
     }
+    else if (strcmp(cmd, "pwd") == 0) {
+      char cwd[FILENAME_MAX];
+      getcwd(cwd, sizeof(cwd));
+      printf("%s\n", cwd);
+    }
     else if (strcmp(cmd, "type") == 0) {
       handle_type(arg);
     }
