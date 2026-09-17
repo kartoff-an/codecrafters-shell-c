@@ -16,7 +16,7 @@
 #define MAX_COMMAND_LENGTH 100
 #define MAX_ARGS 64
 
-static const char *const commands[] = {"echo", "exit", "type", NULL};
+static const char *const commands[] = {"echo", "exit", "type", "pwd", NULL};
 
 char* find_executable(char* command) {
   const char *path = getenv("PATH");
