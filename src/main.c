@@ -67,6 +67,7 @@ void handle_type(char* command) {
 int parse_input(const char *input, char **args, int max_args) {
   int argc = 0;
   int in_single_quote = 0;
+  int in_double_quote = 0;
   char token[MAX_TOKEN_LEN];
   int token_len = 0;
   int has_token = 0;
@@ -74,25 +75,51 @@ int parse_input(const char *input, char **args, int max_args) {
   for (int i = 0; input[i] != '\0'; i++) {
     char c = input[i];
 
-    if (c == '\'') {
-      in_single_quote = !in_single_quote;
-      has_token = 1;
-    }
-    else if (!in_single_quote && (c == ' ' || c == '\t' || c == '\n')) {
-      if (has_token) {
-        token[token_len] = '\0';
-        if (argc < max_args - 1) {
-          args[argc++] = strdup(token);
+    if (in_single_quote) {
+      if (c == '\'') {
+        in_single_quote = 0;
+      }
+      else {
+        if (token_len < MAX_TOKEN_LEN - 1) {
+          token[token_len++] = c;
         }
-        token_len = 0;
-        has_token = 0;
+      }
+    }
+    else if (in_double_quote) {
+      if (c == '"') {
+        in_double_quote = 0;
+      }
+      else {
+        if (token_len < MAX_TOKEN_LEN - 1) {
+          token[token_len++] = c;
+        }
       }
     }
     else {
-      if (token_len < MAX_TOKEN_LEN - 1) {
-        token[token_len++] = c;
+      if (c == '\'') {
+        in_single_quote = 1;
+        has_token = 1;
       }
-      has_token = 1;
+      else if (c == '"') {
+        in_double_quote = 1;
+        has_token = 1;
+      }
+      else if (c == ' ' || c == '\t' || c == '\n') {
+        if (has_token) {
+          token[token_len] = '\0';
+          if (argc < max_args - 1) {
+            args[argc++] = strdup(token);
+          }
+          token_len = 0;
+          has_token = 0;
+        }
+      }
+      else {
+        if (token_len < MAX_TOKEN_LEN - 1) {
+          token[token_len++] = c;
+        }
+        has_token = 1;
+      }
     }
   }
 
