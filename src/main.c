@@ -16,6 +16,7 @@
 
 #define MAX_COMMAND_LENGTH 100
 #define MAX_ARGS 64
+#define MAX_TOKEN_LEN 1024
 
 static const char *const commands[] = {"echo", "exit", "type", "pwd", "cd", NULL};
 
@@ -63,11 +64,62 @@ void handle_type(char* command) {
   printf("%s: not found\n", command);
 }
 
+int parse_input(const char *input, char **args, int max_args) {
+  int argc = 0;
+  int in_single_quote = 0;
+  char token[MAX_TOKEN_LEN];
+  int token_len = 0;
+  int has_token = 0;
+
+  for (int i = 0; input[i] != '\0'; i++) {
+    char c = input[i];
+
+    if (c == '\'') {
+      in_single_quote = !in_single_quote;
+      has_token = 1;
+    }
+    else if (!in_single_quote && (c == ' ' || c == '\t' || c == '\n')) {
+      if (has_token) {
+        token[token_len] = '\0';
+        if (argc < max_args - 1) {
+          args[argc++] = strdup(token);
+        }
+        token_len = 0;
+        has_token = 0;
+      }
+    }
+    else {
+      if (token_len < MAX_TOKEN_LEN - 1) {
+        token[token_len++] = c;
+      }
+      has_token = 1;
+    }
+  }
+
+  if (has_token) {
+    token[token_len] = '\0';
+    if (argc < max_args - 1) {
+      args[argc++] = strdup(token);
+    }
+  }
+
+  args[argc] = NULL;
+  return argc;
+}
+
+void free_args(char **args, int argc) {
+  for (int i = 0; i < argc; i++) {
+    free(args[i]);
+    args[i] = NULL;
+  }
+}
+
 int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
 
   char input[MAX_COMMAND_LENGTH];
+  char *args[MAX_ARGS];
 
   int should_exit = 0;
   while (!should_exit) {
@@ -75,53 +127,56 @@ int main(int argc, char *argv[]) {
 
     fgets(input, sizeof(input), stdin);
     input[strcspn(input, "\n")] = '\0';
-    char *cmd = strtok(input, " ");
-    char *arg = strtok(NULL, "");
-
-    if (cmd == NULL) {
+    
+    int parsed_argc = parse_input(input, args, MAX_ARGS);
+    if (parsed_argc == 0) {
       continue;
     }
 
+    char *cmd = args[0];
+
     if (strcmp(cmd, "exit") == 0) {
-      break;
+      int exit_code = (parsed_argc > 1) ? atoi(args[1]) : 0;
+      free_args(args, parsed_argc);
+      exit(exit_code);
     }
     else if (strcmp(cmd, "echo") == 0) {
-      printf("%s\n", arg);
+      for (int i = 1; i < parsed_argc; i++) {
+        if (i > 1) {
+          printf(" ");
+        }
+        printf("%s", args[i]);
+      }
+      printf("\n");
     }
     else if (strcmp(cmd, "pwd") == 0) {
       char cwd[FILENAME_MAX];
-      getcwd(cwd, sizeof(cwd));
-      printf("%s\n", cwd);
+      if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("%s\n", cwd);
+      }
     }
     else if (strcmp(cmd, "cd") == 0) {
-      if (arg == NULL) continue;
-      if (strcmp(arg, "~") == 0) arg = getenv("HOME");
-      if (chdir(arg) != 0 && errno == ENOENT) {
-        printf("cd: %s: No such file or directory\n", arg);
+      if (parsed_argc > 1) {
+        char *target = args[1];
+        if (strcmp(target, "~") == 0) {
+          target = getenv("HOME");
+        }
+        if (target == NULL || chdir(target) != 0) {
+          printf("cd: %s: No such file or directory\n", args[1]);
+        }
       }
     }
     else if (strcmp(cmd, "type") == 0) {
-      handle_type(arg);
+      if (parsed_argc > 1) {
+        handle_type(args[1]);
+      }
     }
     else {
       char *full_path = find_executable(cmd);
       if (full_path != NULL) {
-        char *exec_args[MAX_ARGS];
-        int arg_idx = 0;
-        exec_args[arg_idx++] = cmd;
-
-        if (arg != NULL) {
-          char *token = strtok(arg, " ");
-          while (token != NULL && arg_idx < MAX_ARGS - 1) {
-            exec_args[arg_idx++] = token;
-            token = strtok(NULL, " ");
-          }
-        }
-        exec_args[arg_idx] = NULL;
-
         pid_t pid = fork();
         if (pid == 0) {
-          execv(full_path, exec_args);
+          execv(full_path, args);
           perror("execv");
           exit(EXIT_FAILURE);
         }
@@ -138,6 +193,8 @@ int main(int argc, char *argv[]) {
         printf("%s: command not found\n", cmd);
       }
     }
+
+    free_args(args, parsed_argc);
   }
 
   return 0;
