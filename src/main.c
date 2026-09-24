@@ -96,7 +96,16 @@ int parse_input(const char *input, char **args, int max_args) {
       }
     }
     else {
-      if (c == '\'') {
+      if (c == '\\') {
+        if (input[i + 1] != '\0') {
+          i++;
+          if (token_len < MAX_TOKEN_LEN - 1) {
+            token[token_len++] = input[i];
+          }
+          has_token = 1;
+        }
+      }
+      else if (c == '\'') {
         in_single_quote = 1;
         has_token = 1;
       }
