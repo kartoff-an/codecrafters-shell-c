@@ -72,6 +72,8 @@ int parse_input(const char *input, char **args, int max_args) {
   int token_len = 0;
   int has_token = 0;
 
+  // const char *const special_chars[] = {'"', '\\', '$', '`'};
+
   for (int i = 0; input[i] != '\0'; i++) {
     char c = input[i];
 
@@ -90,6 +92,11 @@ int parse_input(const char *input, char **args, int max_args) {
         in_double_quote = 0;
       }
       else {
+        if (c == '\\') {
+          if (input[i + 1] == '"' || c == '\\') {
+            c = input[++i];
+          }
+        }
         if (token_len < MAX_TOKEN_LEN - 1) {
           token[token_len++] = c;
         }
