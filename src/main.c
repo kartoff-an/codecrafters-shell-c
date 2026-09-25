@@ -14,7 +14,7 @@
 #define DIR_SEPARATOR_STR "/"
 #endif
 
-#define MAX_COMMAND_LENGTH 100
+#define MAX_COMMAND_LENGTH 1024
 #define MAX_ARGS 64
 #define MAX_TOKEN_LEN 1024
 
@@ -93,7 +93,8 @@ int parse_input(const char *input, char **args, int max_args) {
       }
       else {
         if (c == '\\') {
-          if (input[i + 1] == '"' || c == '\\') {
+          char next = input[i + 1];
+          if (next == '"' || next == '\\') {
             c = input[++i];
           }
         }
@@ -200,7 +201,7 @@ int main(int argc, char *argv[]) {
     }
     else if (strcmp(cmd, "cd") == 0) {
       if (parsed_argc > 1) {
-        char *target = args[1];
+        char *target = (parsed_argc > 1) ? args[1] : getenv("HOME");
         if (strcmp(target, "~") == 0) {
           target = getenv("HOME");
         }
