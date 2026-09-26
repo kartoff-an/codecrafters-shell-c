@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 
 #ifndef PATH_LIST_DELIM
@@ -177,10 +178,48 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
+    // preprocess args for possible redirection operator
+    char *output_dest = NULL;
+    for (int i = 1; i < parsed_argc; i++) {
+      if (strcmp(args[i], ">") == 0 || strcmp(args[i], "1>") == 0) {
+        if (i + 1 < parsed_argc) {
+          output_dest = strdup(args[i + 1]);
+        }
+        for (int j = i; j < parsed_argc; j++) {
+          free(args[j]);
+          args[j] = NULL;
+        }
+        parsed_argc = i;
+        break;
+      }
+    }
+
+    if (parsed_argc == 0) {
+      if (output_dest != NULL) free(output_dest);
+      continue;
+    }
+
     char *cmd = args[0];
+
+    int saved_stdout = -1;
+    int is_builtin = (strcmp(cmd, "echo") == 0 || strcmp(cmd, "pwd") == 0 || 
+                      strcmp(cmd, "type") == 0 || strcmp(cmd, "cd") == 0);
+    
+    if (output_dest != NULL && is_builtin) {
+      int fd = open(output_dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd < 0) {
+        perror("open");
+      }
+      else {
+        saved_stdout = dup(STDOUT_FILENO);
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+      }
+    }
 
     if (strcmp(cmd, "exit") == 0) {
       int exit_code = (parsed_argc > 1) ? atoi(args[1]) : 0;
+      if (output_dest != NULL) free(output_dest);
       free_args(args, parsed_argc);
       exit(exit_code);
     }
@@ -206,7 +245,7 @@ int main(int argc, char *argv[]) {
           target = getenv("HOME");
         }
         if (target == NULL || chdir(target) != 0) {
-          printf("cd: %s: No such file or directory\n", args[1]);
+          fprintf(stderr, "cd: %s: No such file or directory\n", args[1]);
         }
       }
     }
@@ -220,6 +259,22 @@ int main(int argc, char *argv[]) {
       if (full_path != NULL) {
         pid_t pid = fork();
         if (pid == 0) {
+          if (output_dest != NULL) {
+            int fd = open(output_dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd < 0) {
+              perror("open");
+              exit(EXIT_FAILURE);
+            }
+
+            if (dup2(fd, STDOUT_FILENO) < 0) {
+              perror("dup2");
+              close(fd);
+              exit(EXIT_FAILURE);
+            }
+
+            close(fd);
+          }
+
           execv(full_path, args);
           perror("execv");
           exit(EXIT_FAILURE);
@@ -238,6 +293,16 @@ int main(int argc, char *argv[]) {
       }
     }
 
+    if (saved_stdout != -1) {
+      fflush(stdout);
+      dup2(saved_stdout, STDOUT_FILENO);
+      close(saved_stdout);
+    }
+    
+    if (output_dest != NULL) {
+      free(output_dest);
+      output_dest = NULL;
+    }
     free_args(args, parsed_argc);
   }
 
