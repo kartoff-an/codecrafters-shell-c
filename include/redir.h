@@ -1,9 +1,16 @@
 #ifndef REDIR_H
 #define REDIR_H
 
+typedef enum {
+    REDIR_TRUNC,
+    REDIR_APPEND
+} RedirMode;
+
 typedef struct {
     char *stdout_path;
     char *stderr_path;
+    RedirMode stdout_mode;
+    RedirMode stderr_mode;
 } Redirection;
 
 typedef struct {

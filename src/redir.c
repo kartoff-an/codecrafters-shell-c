@@ -10,6 +10,8 @@
 void extract_redirections(char **args, int *argc, Redirection *redir) {
     redir->stdout_path = NULL;
     redir->stderr_path = NULL;
+    redir->stdout_mode = REDIR_TRUNC;
+    redir->stderr_mode = REDIR_TRUNC;
 
     int write_idx = 0;
     for (int i = 0; i < *argc; i++) {
@@ -17,6 +19,7 @@ void extract_redirections(char **args, int *argc, Redirection *redir) {
             if (i + 1 < *argc) {
                 free(redir->stdout_path);
                 redir->stdout_path = strdup(args[i + 1]);
+                redir->stdout_mode = REDIR_TRUNC;
                 free(args[i]);
                 free(args[i + 1]);
                 i++;
@@ -29,6 +32,33 @@ void extract_redirections(char **args, int *argc, Redirection *redir) {
             if (i + 1 < *argc) {
                 free(redir->stderr_path);
                 redir->stderr_path = strdup(args[i + 1]);
+                redir->stderr_mode = REDIR_TRUNC;
+                free(args[i]);
+                free(args[i + 1]);
+                i++;
+            }
+            else {
+                free(args[i]);
+            }
+        }
+        else if (strcmp(args[i], ">>") == 0 || strcmp(args[i], "1>>") == 0) {
+            if (i + 1 < *argc) {
+                free(redir->stdout_path);
+                redir->stdout_path = strdup(args[i + 1]);
+                redir->stdout_mode = REDIR_APPEND;
+                free(args[i]);
+                free(args[i + 1]);
+                i++;
+            }
+            else {
+                free(args[i]);
+            }
+        }
+        else if (strcmp(args[i], "2>>") == 0) {
+            if (i + 1 < *argc) {
+                free(redir->stderr_path);
+                redir->stderr_path = strdup(args[i + 1]);
+                redir->stderr_mode = REDIR_APPEND;
                 free(args[i]);
                 free(args[i + 1]);
                 i++;
@@ -53,10 +83,11 @@ void apply_redirection(const Redirection *redir, RedirBackup *backup) {
     }
 
     if (redir->stdout_path) {
-        int fd = open(redir->stdout_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        int mode_flag = (redir->stdout_mode == REDIR_APPEND) ? O_APPEND : O_TRUNC;
+        int fd = open(redir->stdout_path, O_WRONLY | O_CREAT | mode_flag, 0644);
         if (fd >= 0) {
             if (backup) {
-                backup->saved_stdout = dup(STDERR_FILENO);
+                backup->saved_stdout = dup(STDOUT_FILENO);
             }
             dup2(fd, STDOUT_FILENO);
             close(fd);
@@ -67,7 +98,8 @@ void apply_redirection(const Redirection *redir, RedirBackup *backup) {
     }
 
     if (redir->stderr_path) {
-        int fd = open(redir->stderr_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        int mode_flag = (redir->stderr_mode == REDIR_APPEND) ? O_APPEND : O_TRUNC;
+        int fd = open(redir->stderr_path, O_WRONLY | O_CREAT | mode_flag, 0644);
         if (fd >= 0) {
             if (backup) {
                 backup->saved_stderr = dup(STDERR_FILENO);
