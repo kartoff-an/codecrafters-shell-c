@@ -85,3 +85,13 @@ const BuiltinCommand* find_builtin(const char *name) {
     }
     return NULL;
 }
+
+const char **get_builtin_names(void) {
+    static const char *names[sizeof(builtins) / sizeof(builtins[0])];
+
+    for (int i = 0; builtins[i].name != NULL; i++) {
+        names[i] = builtins[i].name;
+    }
+
+    return names;
+}

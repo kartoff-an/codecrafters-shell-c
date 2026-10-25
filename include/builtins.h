@@ -10,4 +10,6 @@ typedef struct {
 
 const BuiltinCommand* find_builtin(const char *name);
 
+const char **get_builtin_names(void);
+
 #endif
