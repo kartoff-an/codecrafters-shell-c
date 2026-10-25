@@ -55,7 +55,7 @@ int main(void) {
   rl_completion_append_character = ' ';
 
   while (1) {
-    input = readline("kart> ");
+    input = readline("$ ");
     if (input == NULL) {
       break;
     }
